@@ -60,7 +60,7 @@ Question → plan (locate drop → slice decline codes → correlate events → 
 
 The LLM never writes to the database. Retrieval means **query results and metric definitions**, not a pile of PDFs.
 
-## Run the plan site
+## Run locally
 
 ```bash
 npm install
