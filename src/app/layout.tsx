@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Transaction Analytics Agent · Implementation Plan",
+  title: "Payment Root Cause AI",
   description:
-    "Executable engineering plan for a payments auth-rate diagnosis agent: synthetic book, SQL tools, and one planted incident.",
+    "Sample UI for a payments authorization-rate root-cause analyst: plan, query, cite.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

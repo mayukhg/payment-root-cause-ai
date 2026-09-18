@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Link from "next/link";
 import {
   agentLoop,
   architectureLayers,
@@ -47,6 +48,12 @@ export function PlanPage() {
               Transaction Analytics Agent
             </p>
           </div>
+          <Link
+            href="/"
+            className="shrink-0 text-xs text-emerald-400 hover:text-emerald-300"
+          >
+            Sample UI
+          </Link>
           <nav className="hidden max-w-3xl flex-wrap justify-end gap-x-3 gap-y-1 lg:flex">
             {nav.map((item) => (
               <a

@@ -1,5 +1,5 @@
-import { PlanPage } from "@/components/plan/plan-page";
+import { AnalystApp } from "@/components/analyst/app";
 
 export default function Home() {
-  return <PlanPage />;
+  return <AnalystApp />;
 }

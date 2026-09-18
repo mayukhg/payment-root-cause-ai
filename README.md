@@ -21,11 +21,12 @@ If the model answers without running queries, it has failed the purpose of this 
 
 | Now | Next (see the plan) |
 | --- | --- |
-| The executable implementation plan: schema, tools, agent loop, demo scenario | Seeded payments DB, read-only SQL tools, planner agent, chat + evidence UI |
+| Sample analyst UI (mock tool loop) plus the executable implementation plan | Seeded payments DB, live LLM planner, real read-only SQL |
 
 The plan is written to be built, not discussed: frozen demo clock, planted incident, metric definitions, tool contracts, and a phased file list.
 
-Read the full engineering plan in [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md). Browse it as a site with `npm run dev`.
+- Sample UI: `/` — ask the Tuesday question and inspect cited SQL in the evidence drawer.
+- Plan: `/plan` and [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md).
 
 ## What this repo is not
 
