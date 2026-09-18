@@ -1,194 +1,54 @@
 "use client";
 
+import { EvidencePane } from "@/components/analyst/evidence-pane";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   GOLDEN_QUESTION,
+  bookKpis,
   suggestedPrompts,
   type AnalyzeResult,
-  type ToolCall,
 } from "@/lib/demo";
 import { cn } from "@/lib/utils";
 import {
-  Activity,
-  AlertTriangle,
   ArrowUpRight,
-  Database,
   LoaderCircle,
+  RotateCcw,
   Send,
 } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useMemo, useRef, useState } from "react";
 
 type ChatTurn =
   | { id: string; role: "user"; text: string }
   | { id: string; role: "assistant"; result: AnalyzeResult; status: "ok" }
   | { id: string; role: "assistant"; status: "error"; text: string };
 
-function Sparkline({
-  series,
+function AssistantBody({
+  result,
+  onCite,
 }: {
-  series: AnalyzeResult["hourly"];
+  result: AnalyzeResult;
+  onCite: (id: string) => void;
 }) {
-  if (series.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        No hourly series for this answer.
-      </p>
-    );
-  }
-  const w = 560;
-  const h = 140;
-  const pad = 12;
-  const ys = series.flatMap((p) => [p.authRate, p.baseline]);
-  const min = Math.min(...ys) - 1;
-  const max = Math.max(...ys) + 1;
-  const x = (i: number) => pad + (i * (w - pad * 2)) / (series.length - 1);
-  const y = (v: number) => pad + ((max - v) * (h - pad * 2)) / (max - min);
-  const path = (key: "authRate" | "baseline") =>
-    series.map((p, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(p[key])}`).join(" ");
-
-  return (
-    <div>
-      <svg viewBox={`0 0 ${w} ${h}`} className="h-36 w-full" role="img" aria-label="Hourly authorization rate versus baseline">
-        <path d={path("baseline")} fill="none" stroke="oklch(0.65 0 0)" strokeWidth="2" strokeDasharray="4 4" />
-        <path d={path("authRate")} fill="none" stroke="oklch(0.78 0.15 165)" strokeWidth="2.5" />
-        {series.map((p, i) =>
-          p.authRate < p.baseline - 3 ? (
-            <circle key={p.hour} cx={x(i)} cy={y(p.authRate)} r="4" fill="oklch(0.72 0.18 25)" />
-          ) : null
-        )}
-      </svg>
-      <div className="mt-1 flex justify-between font-mono text-[10px] text-muted-foreground">
-        {series.filter((_, i) => i % 2 === 0).map((p) => (
-          <span key={p.hour}>{p.hour}</span>
-        ))}
-      </div>
-      <p className="mt-2 text-xs text-muted-foreground">
-        Solid: Tuesday auth rate. Dashed: 14-day hourly baseline. Red dots: hours more than 3pp below baseline.
-      </p>
-    </div>
-  );
-}
-
-function ResultTable({ rows }: { rows: ToolCall["rows"] }) {
-  if (rows.length === 0) {
-    return <p className="text-sm text-muted-foreground">No rows returned.</p>;
-  }
-  const cols = Object.keys(rows[0]);
-  return (
-    <div className="overflow-x-auto rounded-lg ring-1 ring-foreground/10">
-      <table className="w-full min-w-[20rem] text-left text-xs">
-        <thead className="bg-muted/60 text-muted-foreground">
-          <tr>
-            {cols.map((c) => (
-              <th key={c} className="px-2 py-1.5 font-medium font-mono">
-                {c}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} className="border-t border-border/70">
-              {cols.map((c) => (
-                <td key={c} className="px-2 py-1.5 font-mono">
-                  {String(row[c])}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function Evidence({ result }: { result: AnalyzeResult | null }) {
-  if (!result) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-        <Database className="size-8 text-emerald-400/80" />
-        <p className="text-sm font-medium">Evidence drawer</p>
-        <p className="max-w-sm text-sm text-muted-foreground">
-          Queries appear here after the analyst runs. Nothing is cited unless a tool returned it.
-        </p>
-      </div>
-    );
-  }
-
-  if (result.tools.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-        <AlertTriangle className="size-8 text-amber-400" />
-        <p className="text-sm font-medium">No SQL in this turn</p>
-        <p className="max-w-sm text-sm text-muted-foreground">
-          {result.narrative}
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b border-border/80 px-4 py-3">
-        <p className="font-mono text-[11px] tracking-widest text-emerald-400 uppercase">
-          Evidence
-        </p>
-        <p className="text-sm text-muted-foreground">
-          {result.tools.length} tool calls · citations {result.citations.join(", ")}
-        </p>
-      </div>
-      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4">
-        {result.hourly.length > 0 ? (
-          <div>
-            <h3 className="mb-2 text-sm font-medium">Hourly auth rate</h3>
-            <Sparkline series={result.hourly} />
-          </div>
-        ) : null}
-        {result.tools.map((tool) => (
-          <div key={tool.id} className="rounded-xl bg-card/60 p-3 ring-1 ring-foreground/10">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="font-mono">
-                {tool.id}
-              </Badge>
-              <span className="font-mono text-xs">{tool.name}</span>
-              <span className="text-xs text-muted-foreground">{tool.elapsedMs}ms</span>
-            </div>
-            <p className="mb-2 text-sm">{tool.purpose}</p>
-            {tool.sql ? (
-              <pre className="mb-3 overflow-x-auto rounded-lg bg-black/40 p-2 font-mono text-[11px] leading-relaxed text-emerald-100/90">
-                {tool.sql}
-              </pre>
-            ) : null}
-            <ResultTable rows={tool.rows} />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AssistantBody({ result }: { result: AnalyzeResult }) {
   return (
     <div className="space-y-4">
       <div>
-        <p className="font-medium">{result.headline}</p>
+        <p className="text-base font-medium tracking-tight">{result.headline}</p>
         <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
           {result.narrative}
         </p>
       </div>
       {result.window ? (
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <div className="rounded-lg bg-muted/40 p-2">
+          <div className="rounded-lg bg-muted/40 p-2.5">
             <dt className="text-xs text-muted-foreground">Window</dt>
-            <dd className="font-mono text-xs">{result.window}</dd>
+            <dd className="mt-0.5 font-mono text-xs">{result.window}</dd>
           </div>
-          <div className="rounded-lg bg-muted/40 p-2">
+          <div className="rounded-lg bg-muted/40 p-2.5">
             <dt className="text-xs text-muted-foreground">Primary cause</dt>
-            <dd className="font-mono text-xs">{result.primaryCause}</dd>
+            <dd className="mt-0.5 font-mono text-xs">{result.primaryCause}</dd>
           </div>
         </dl>
       ) : null}
@@ -216,6 +76,20 @@ function AssistantBody({ result }: { result: AnalyzeResult }) {
           {result.notProven}
         </p>
       ) : null}
+      {result.citations.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {result.citations.map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onCite(id)}
+              className="rounded-full border border-border px-2 py-0.5 font-mono text-[11px] text-emerald-300 hover:bg-muted"
+            >
+              {id}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {result.steps.length > 0 ? (
         <ol className="space-y-1 border-t border-border/60 pt-3 text-xs text-muted-foreground">
           {result.steps.map((step, i) => (
@@ -235,6 +109,8 @@ export function AnalystApp() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pane, setPane] = useState<"chat" | "evidence">("chat");
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [planStep, setPlanStep] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(0);
 
@@ -251,19 +127,42 @@ export function AnalystApp() {
     return null;
   }, [turns]);
 
+  function scrollChat() {
+    requestAnimationFrame(() => {
+      listRef.current?.scrollTo({
+        top: listRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    });
+  }
+
+  function cite(id: string) {
+    setFocusedId(id);
+    setPane("evidence");
+    requestAnimationFrame(() => {
+      document.getElementById(`tool-${id}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }
+
   async function runQuestion(question: string) {
     const text = question.trim();
     if (!text || busy) return;
     setError(null);
     setBusy(true);
+    setPlanStep(0);
     setPane("chat");
-    const userTurn: ChatTurn = {
-      id: nextId("u"),
-      role: "user",
-      text,
-    };
-    setTurns((prev) => [...prev, userTurn]);
+    setFocusedId(null);
+    setTurns((prev) => [...prev, { id: nextId("u"), role: "user", text }]);
     setInput("");
+    scrollChat();
+
+    const tick = window.setInterval(() => {
+      setPlanStep((s) => Math.min(s + 1, 4));
+    }, 280);
+
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -286,14 +185,13 @@ export function AnalystApp() {
           id: nextId("e"),
           role: "assistant",
           status: "error",
-          text: "The analyst could not finish this turn. Check the API and retry.",
+          text: "The analyst could not finish this turn. Retry the question.",
         },
       ]);
     } finally {
+      window.clearInterval(tick);
       setBusy(false);
-      requestAnimationFrame(() => {
-        listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-      });
+      scrollChat();
     }
   }
 
@@ -302,84 +200,132 @@ export function AnalystApp() {
     void runQuestion(input);
   }
 
+  function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void runQuestion(input);
+    }
+  }
+
+  function reset() {
+    setTurns([]);
+    setError(null);
+    setFocusedId(null);
+    setInput(GOLDEN_QUESTION);
+    setPane("chat");
+  }
+
+  const planning = [
+    "Resolving relative dates…",
+    "Locating the hourly drop…",
+    "Slicing decline codes × gateway…",
+    "Joining deploys and outages…",
+    "Estimating a bypass counterfactual…",
+  ];
+
   const chat = (
     <div className="flex h-full min-h-0 flex-col">
-      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
         {turns.length === 0 ? (
-          <div className="mx-auto flex max-w-lg flex-col items-start gap-4 py-10">
-            <Activity className="size-9 text-emerald-400" />
+          <div className="mx-auto flex max-w-xl flex-col gap-6 py-8">
             <div>
-              <h2 className="text-xl font-semibold tracking-tight">
-                Diagnose why authorization rate moved
+              <p className="font-mono text-[11px] tracking-widest text-emerald-400 uppercase">
+                Investigation
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+                Why did authorization rate move?
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                Sample UI for Payment Root Cause AI. The analyst plans, runs read-only
-                SQL against a synthetic book, then cites the result. Demo clock is
-                Friday 18 Sep 2026.
+                Ask a high-level payments question. The analyst plans, runs
+                read-only SQL against a synthetic book, and cites every figure.
+                Demo clock is Friday 18 Sep 2026.
               </p>
             </div>
-            <div className="flex w-full flex-col gap-2">
-              {suggestedPrompts.map((prompt) => (
+            <div className="flex flex-col gap-2">
+              {suggestedPrompts.map((prompt, index) => (
                 <button
                   key={prompt}
                   type="button"
                   onClick={() => void runQuestion(prompt)}
-                  className="rounded-xl border border-border/80 bg-card/50 px-3 py-2 text-left text-sm hover:bg-muted/50"
+                  className="rounded-xl border border-border/80 bg-card/60 px-4 py-3 text-left text-sm transition-colors hover:border-emerald-500/40 hover:bg-muted/40"
                 >
+                  <span className="mb-1 block font-mono text-[10px] text-emerald-400">
+                    {index === 0 ? "Aha demo" : index === 2 ? "Out of slice" : "Follow-up"}
+                  </span>
                   {prompt}
                 </button>
               ))}
             </div>
           </div>
         ) : (
-          <div className="mx-auto flex max-w-2xl flex-col gap-4">
+          <div className="mx-auto flex max-w-2xl flex-col gap-4 pb-4">
             {turns.map((turn) => (
               <div
                 key={turn.id}
                 className={cn(
                   "rounded-2xl px-4 py-3 text-sm",
                   turn.role === "user"
-                    ? "ml-8 bg-emerald-500/15"
-                    : "mr-4 bg-card ring-1 ring-foreground/10"
+                    ? "ml-6 bg-emerald-500/15 sm:ml-10"
+                    : "mr-2 bg-card ring-1 ring-foreground/10 sm:mr-4"
                 )}
               >
                 {turn.role === "user" ? (
                   <p>{turn.text}</p>
                 ) : turn.status === "error" ? (
-                  <p className="text-destructive">{turn.text}</p>
+                  <div className="space-y-2">
+                    <p className="text-destructive">{turn.text}</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void runQuestion(GOLDEN_QUESTION)}
+                    >
+                      Retry Tuesday question
+                    </Button>
+                  </div>
                 ) : (
-                  <AssistantBody result={turn.result} />
+                  <AssistantBody result={turn.result} onCite={cite} />
                 )}
               </div>
             ))}
             {busy ? (
-              <div className="mr-4 flex items-center gap-2 rounded-2xl bg-card px-4 py-3 text-sm text-muted-foreground ring-1 ring-foreground/10">
-                <LoaderCircle className="size-4 animate-spin" />
-                Planning, then querying metric views…
+              <div className="mr-2 rounded-2xl bg-card px-4 py-3 text-sm ring-1 ring-foreground/10 sm:mr-4">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <LoaderCircle className="size-4 animate-spin" />
+                  {planning[planStep]}
+                </div>
               </div>
             ) : null}
           </div>
         )}
       </div>
-      <form
-        onSubmit={onSubmit}
-        className="border-t border-border/80 p-3 sm:p-4"
-      >
+      <form onSubmit={onSubmit} className="border-t border-border/80 p-3 sm:p-4">
         {error ? (
           <p className="mb-2 text-xs text-destructive" role="alert">
             {error}
           </p>
-        ) : null}
+        ) : (
+          <p className="mb-2 text-xs text-muted-foreground">
+            Enter to run · Shift+Enter for a new line
+          </p>
+        )}
         <div className="flex items-end gap-2">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
             rows={2}
             placeholder="Ask why auth rate moved…"
             className="min-h-16 flex-1 resize-none rounded-xl border border-input bg-input/30 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             disabled={busy}
+            aria-label="Question"
           />
-          <Button type="submit" disabled={busy || !input.trim()} size="lg" className="bg-emerald-500 text-black hover:bg-emerald-400">
+          <Button
+            type="submit"
+            disabled={busy || !input.trim()}
+            size="lg"
+            className="bg-emerald-500 text-black hover:bg-emerald-400"
+          >
             <Send />
             Run
           </Button>
@@ -389,32 +335,47 @@ export function AnalystApp() {
   );
 
   return (
-    <div className="flex min-h-svh flex-col bg-background">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 px-4 py-3 sm:px-6">
-        <div>
-          <p className="font-mono text-[11px] tracking-widest text-emerald-400 uppercase">
-            Sample UI · mock analyst
-          </p>
-          <h1 className="text-sm font-semibold sm:text-base">
-            Payment Root Cause AI
-          </h1>
+    <div className="flex h-svh flex-col overflow-hidden bg-background">
+      <header className="shrink-0 border-b border-border/80">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div>
+            <p className="font-mono text-[11px] tracking-widest text-emerald-400 uppercase">
+              Payments analyst
+            </p>
+            <h1 className="text-sm font-semibold sm:text-base">
+              Payment Root Cause AI
+            </h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline">Demo clock 2026-09-18</Badge>
+            <Button type="button" variant="ghost" size="sm" onClick={reset}>
+              <RotateCcw />
+              New investigation
+            </Button>
+            <Link
+              href="/plan"
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+            >
+              Plan
+              <ArrowUpRight />
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">Clock 2026-09-18</Badge>
-          <Link
-            href="/plan"
-            className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-          >
-            Implementation plan
-            <ArrowUpRight />
-          </Link>
+        <div className="grid grid-cols-2 gap-px border-t border-border/80 bg-border/80 lg:grid-cols-4">
+          {bookKpis.map((kpi) => (
+            <div key={kpi.label} className="bg-background px-4 py-3">
+              <p className="text-[11px] text-muted-foreground">{kpi.label}</p>
+              <p className="font-mono text-lg tracking-tight">{kpi.value}</p>
+              <p className="text-[11px] text-muted-foreground">{kpi.hint}</p>
+            </div>
+          ))}
         </div>
       </header>
 
-      <div className="hidden min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(20rem,0.95fr)]">
+      <div className="hidden min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(22rem,0.92fr)]">
         <section className="min-h-0 border-r border-border/80">{chat}</section>
-        <aside className="min-h-0 bg-black/20">
-          <Evidence result={latestResult} />
+        <aside className="min-h-0 bg-black/25">
+          <EvidencePane result={latestResult} busy={busy} focusedId={focusedId} />
         </aside>
       </div>
 
@@ -426,7 +387,7 @@ export function AnalystApp() {
           }}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <TabsList className="mx-3 mt-2">
+          <TabsList className="mx-3 mt-2 w-[calc(100%-1.5rem)]">
             <TabsTrigger value="chat">Chat</TabsTrigger>
             <TabsTrigger value="evidence">Evidence</TabsTrigger>
           </TabsList>
@@ -434,7 +395,7 @@ export function AnalystApp() {
             {chat}
           </TabsContent>
           <TabsContent value="evidence" className="min-h-0 flex-1 overflow-hidden">
-            <Evidence result={latestResult} />
+            <EvidencePane result={latestResult} busy={busy} focusedId={focusedId} />
           </TabsContent>
         </Tabs>
       </div>

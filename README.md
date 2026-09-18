@@ -67,7 +67,7 @@ npm install
 npm run dev
 ```
 
-Open [http://127.0.0.1:43217](http://127.0.0.1:43217).
+Open [http://127.0.0.1:43217](http://127.0.0.1:43217) for the analyst UI (chat + evidence). Open `/plan` for the engineering blueprint.
 
 ## Build sequence (when implementing)
 

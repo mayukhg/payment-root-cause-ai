@@ -182,6 +182,13 @@ const unclear: AnalyzeResult = {
   tools: [],
 };
 
+export const bookKpis = [
+  { label: "14-day auth rate", value: "91.3%", hint: "Book baseline" },
+  { label: "Tuesday 15–17 UTC", value: "86.1%", hint: "−5.1pp vs baseline" },
+  { label: "ATV (authorized)", value: "$48.20", hint: "USD equivalent" },
+  { label: "Timeout share", value: "6.1%", hint: "In the drop window" },
+];
+
 export const suggestedPrompts = [
   GOLDEN_QUESTION,
   "Was Tuesday’s drop issuer-driven or a gateway issue?",
